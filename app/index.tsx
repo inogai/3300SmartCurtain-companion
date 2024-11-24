@@ -80,24 +80,24 @@ export default function Screen() {
     console.log('Connecting')
     if (!device) {
       await selectPairedDevices()
-      console.error('Device not found')
-      return
     }
 
-    let connection = await device.isConnected()
-    if (!connection) {
-      connection = await device.connect()
-      console.log('Connected')
-    }
-    else {
-      console.log('Already connected')
-    }
+    if (device) {
+      let connection = await device.isConnected()
+      if (!connection) {
+        connection = await device.connect()
+        console.log('Connected')
+      }
+      else {
+        console.log('Already connected')
+      }
 
-    setConnection(connection)
-    initailizeRead()
+      setConnection(connection)
+      initailizeRead()
 
-    updateLedState()
-    loadThresholds()
+      updateLedState()
+      loadThresholds()
+    }
   }
 
   async function disconnect() {
