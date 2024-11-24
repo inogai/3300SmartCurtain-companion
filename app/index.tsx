@@ -8,6 +8,7 @@ import { Button } from '~/components/ui/button'
 import {
   Card,
   CardContent,
+  CardFooter,
   CardHeader,
 } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
@@ -153,6 +154,26 @@ export default function Screen() {
   }
 
   const [readSubscription, setReadSubscription] = React.useState<BluetoothEventSubscription | null>(null)
+  const [lightIntensity, setLightIntensity] = React.useState<number>(0)
+
+  let pollLiInterval: NodeJS.Timeout | null = null
+
+  function pollLightIntensity() {
+    if (pollLiInterval) {
+      clearInterval(pollLiInterval)
+    }
+
+    pollLiInterval = setInterval(async () => {
+      if (device) {
+        device.write('12', 'hex')
+      }
+    }, 5000)
+  }
+
+  pollLightIntensity()
+
+  const [lightThresoldUpper, setLightThresholdUpper] = React.useState<number>(2000)
+  const [lightThresoldLower, setLightThresholdLower] = React.useState<number>(500)
 
   function initailizeRead() {
     if (!device) {
@@ -170,6 +191,21 @@ export default function Screen() {
         const val = Number.parseInt(msg.data.split('led_state=')[1], 10)
         setLedState(val)
       }
+
+      if (msg.data.includes('adc_value=')) {
+        const val = Number.parseInt(msg.data.split('adc_value=')[1], 10)
+        setLightIntensity(val)
+      }
+
+      if (msg.data.includes('light_thresold_upper=')) {
+        const val = Number.parseInt(msg.data.split('light_thresold_upper=')[1], 10)
+        setLightThresholdUpper(val)
+      }
+
+      if (msg.data.includes('light_thresold_lower=')) {
+        const val = Number.parseInt(msg.data.split('light_thresold_lower=')[1], 10)
+        setLightThresholdLower(val)
+      }
     })
     setReadSubscription(subscription)
   }
@@ -181,7 +217,34 @@ export default function Screen() {
     }
   }
 
-  const [lightThreasholdInputValue, setLightThreasholdInputValue] = React.useState<number>(1500)
+  function loadThresholds() {
+    if (device) {
+      device.write('13', 'hex')
+      device.write('14', 'hex')
+    }
+  }
+
+  function toHex(val: number, bytes: number): string {
+    const str = val.toString(16)
+
+    if (str.length < bytes * 2) {
+      return str.padStart(bytes * 2, '0')
+    }
+    else if (str.length > bytes * 2) {
+      return str.slice(0, bytes * 2)
+    }
+
+    return str
+  }
+
+  function applyThresholds() {
+    if (device) {
+      device.write('21', 'hex')
+      device.write(toHex(lightThresoldUpper, 2), 'hex')
+      device.write('22', 'hex')
+      device.write(toHex(lightThresoldLower, 2), 'hex')
+    }
+  }
 
   return (
     <View className="flex-1 justify-startitems-start gap-5 p-6 bg-secondary/30">
@@ -261,6 +324,11 @@ Address: ${device.address}`
           <Text className="text-xl font-semibold">Light Intensity Thresold</Text>
         </CardHeader>
         <CardContent>
+          <View className="flex-row justify-between">
+            <Text>Current Value</Text>
+            <Text>{lightIntensity}</Text>
+          </View>
+
           <Text>
             Higher Thresold
           </Text>
@@ -269,14 +337,41 @@ Address: ${device.address}`
               <Slider
                 minimumValue={0}
                 maximumValue={5000}
-                value={lightThreasholdInputValue}
-                onValueChange={setLightThreasholdInputValue}
+                value={lightThresoldUpper}
+                onValueChange={setLightThresholdUpper}
                 step={1}
               />
             </View>
-            <Text className="w-[40px]">{lightThreasholdInputValue}</Text>
+            <Text className="w-[40px]">{lightThresoldUpper}</Text>
+          </View>
+
+          <Text>
+            Lower Thresold
+          </Text>
+          <View className="flex-row justify-between">
+            <View className="grow">
+              <Slider
+                minimumValue={0}
+                maximumValue={5000}
+                value={lightThresoldLower}
+                onValueChange={setLightThresholdLower}
+                step={1}
+              />
+            </View>
+            <Text className="w-[40px]">{lightThresoldLower}</Text>
           </View>
         </CardContent>
+        <CardFooter>
+          <View className="flex-row justify-between gap-6">
+            <Button onPress={loadThresholds}>
+              <Text>Cancel</Text>
+            </Button>
+
+            <Button onPress={applyThresholds}>
+              <Text>Apply</Text>
+            </Button>
+          </View>
+        </CardFooter>
       </Card>
     </View>
   )
