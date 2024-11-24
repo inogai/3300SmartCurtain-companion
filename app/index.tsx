@@ -11,7 +11,6 @@ import {
   CardFooter,
   CardHeader,
 } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
 import { Text } from '~/components/ui/text'
 
 const deviceName = 'GROUP28 SMART CURTAIN'
@@ -63,12 +62,6 @@ export default function Screen() {
   const [device, setDevice] = React.useState<BluetoothDevice | null>(null)
   const [connection, setConnection] = React.useState<boolean>(false)
 
-  async function doRead() {
-    console.log('Reading data')
-    const message = await this.props.device.read()
-    console.log('Message:', message)
-  }
-
   async function selectPairedDevices() {
     const pairedDevices = await RNBluetoothClassic.getBondedDevices()
 
@@ -110,7 +103,7 @@ export default function Screen() {
 
   async function disconnect() {
     if (device) {
-      const conn = await device.disconnect()
+      await device.disconnect()
       removeReadSubscription()
     }
   }
@@ -280,20 +273,6 @@ Address: ${device.address}`
       </Card>
 
       <Row>
-        <Button onPress={updateLedState}>
-          <Text> Query State </Text>
-        </Button>
-        <Button onPress={doRead}>
-          <Text> Read </Text>
-
-        </Button>
-        <Text>
-          Connected:
-          {connection ? 'Yes' : 'No'}
-        </Text>
-      </Row>
-
-      <Row>
         <Button onPress={connect}>
           <Text> Connect </Text>
         </Button>
@@ -301,8 +280,8 @@ Address: ${device.address}`
           <Text> Disconnect </Text>
         </Button>
         <Text>
-          Available:
-          {}
+          Connected:
+          {connection ? 'Yes' : 'No'}
         </Text>
       </Row>
 
