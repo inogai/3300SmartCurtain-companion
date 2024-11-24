@@ -1,7 +1,7 @@
-import type { BluetoothDevice } from 'react-native-bluetooth-classic'
+import type { BluetoothDevice, BluetoothEventSubscription } from 'react-native-bluetooth-classic'
 import Slider from '@react-native-community/slider'
 import * as React from 'react'
-import { View } from 'react-native'
+import { Platform, View } from 'react-native'
 import RNBluetoothClassic, { BluetoothEventType } from 'react-native-bluetooth-classic'
 import { Button } from '~/components/ui/button'
 
@@ -13,8 +13,8 @@ import {
 import { Input } from '~/components/ui/input'
 import { Text } from '~/components/ui/text'
 
-// const deviceName = 'GROUP28 SMART CURTAIN'
-const deviceName = 'inogai-mba'
+const deviceName = 'GROUP28 SMART CURTAIN'
+// const deviceName = 'inogai-mba'
 
 type FC = React.FC<{ children: React.ReactNode }>
 
@@ -46,11 +46,12 @@ const CmdButton: React.FC<{
   device: BluetoothDevice | null
   cmd: string
   label: string
+  encoding?: 'utf8' | 'hex'
 }> = ({ ...props }) => {
   return (
     <Button
       disabled={!props.device}
-      onPress={() => props.device?.write(props.cmd)}
+      onPress={() => props.device?.write(props.cmd, props.encoding ?? 'hex')}
     >
       <Text className="text-2xl font-semibold">{props.label}</Text>
     </Button>
@@ -60,67 +61,124 @@ const CmdButton: React.FC<{
 export default function Screen() {
   const [device, setDevice] = React.useState<BluetoothDevice | null>(null)
   const [connection, setConnection] = React.useState<boolean>(false)
-  let readSubscription: any = null
+
+  async function doRead() {
+    console.log('Reading data')
+    const message = await this.props.device.read()
+    console.log('Message:', message)
+  }
 
   async function selectPairedDevices() {
-    try {
-      const pairedDevices = await RNBluetoothClassic.getBondedDevices()
+    const pairedDevices = await RNBluetoothClassic.getBondedDevices()
 
-      for (const device of pairedDevices) {
-        if (device.name === deviceName) {
-          setDevice(device)
-          console.log('Device found', device)
-          return
-        }
+    for (const device of pairedDevices) {
+      if (device.name === deviceName) {
+        setDevice(device)
+        console.log('Device found', device)
+        return device
       }
+    }
 
-      throw new Error('Device not found')
-    }
-    catch (err) {
-    // Error if Bluetooth is not enabled
-    // Or there are any issues requesting paired devices
-      console.error(err)
-    }
+    throw new Error('Device not found')
   }
 
   async function connect() {
+    console.log('Connecting')
     if (!device) {
-      console.error('No device selected.')
+      await selectPairedDevices()
+      console.error('Device not found')
       return
     }
     try {
       let connection = await device.isConnected()
-      console.error('Already connected')
       if (!connection) {
         connection = await device.connect()
+        console.log('Connected')
+      }
+      else {
+        console.log('Already connected')
       }
 
       setConnection(connection)
-      initializeRead()
+      initailizeRead()
     }
     catch (error) {
     // Handle error accordingly
     }
   }
 
-  function initializeRead() {
-    if (!device) {
-      console.error('No device selected.')
-      return
+  async function disconnect() {
+    if (device) {
+      const conn = await device.disconnect()
+      removeReadSubscription()
     }
-    readSubscription = device.onDataReceived(data => onReceivedData(data))
   }
 
-  async function onReceivedData(data: string) {
-    console.log('Received data:', data)
+  function waitForData(timeout: number): Promise<string> {
+    return new Promise((resolve, reject) => {
+      if (!device) {
+        reject(new Error('Device not found'))
+      }
+
+      let timeoutId: NodeJS.Timeout | null = null
+
+      const subscription = device!.onDataReceived((msg) => {
+        subscription.remove()
+        resolve(msg.data)
+
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+      })
+
+      timeoutId = setTimeout(() => {
+        if (subscription) {
+          subscription.remove()
+        }
+      }, timeout)
+    })
   }
 
-  function send(data: string) {
+  const [ledState, setLedState] = React.useState<number>(0)
+
+  async function updateLedState() {
+    if (device) {
+      const promise = waitForData(1000)
+      device.write('11', 'hex')
+      const data = await promise
+
+      const val = Number.parseInt(data.split('led_state=')[1], 10)
+      setLedState(val)
+    }
+  }
+
+  const [readSubscription, setReadSubscription] = React.useState<BluetoothEventSubscription | null>(null)
+
+  function initailizeRead() {
     if (!device) {
-      console.error('No device selected.')
+      console.error('Device not found')
       return
     }
-    device.write(data, 'hex')
+    if (readSubscription) {
+      console.warn('Subscription already exists, removing it.')
+      readSubscription.remove()
+    }
+    const subscription = device.onDataReceived((msg) => {
+      console.log('Data received:', msg.data)
+
+      if (msg.data.includes('led_state=')) {
+        const val = Number.parseInt(msg.data.split('led_state=')[1], 10)
+        setLedState(val)
+      }
+    })
+    setReadSubscription(subscription)
+  }
+
+  function removeReadSubscription() {
+    if (readSubscription) {
+      readSubscription.remove()
+      setReadSubscription(null)
+    }
   }
 
   const [lightThreasholdInputValue, setLightThreasholdInputValue] = React.useState<number>(1500)
@@ -159,16 +217,30 @@ Address: ${device.address}`
       </Card>
 
       <Row>
-        <Button onPress={connect}>
-          <Text> Connect </Text>
+        <Button onPress={updateLedState}>
+          <Text> Query State </Text>
+        </Button>
+        <Button onPress={doRead}>
+          <Text> Read </Text>
+
         </Button>
         <Text>
           Connected:
           {connection ? 'Yes' : 'No'}
         </Text>
-        <Button onPress={initializeRead}>
-          <Text> initializeRead </Text>
+      </Row>
+
+      <Row>
+        <Button onPress={connect}>
+          <Text> Connect </Text>
         </Button>
+        <Button onPress={disconnect}>
+          <Text> Disconnect </Text>
+        </Button>
+        <Text>
+          Available:
+          {}
+        </Text>
       </Row>
 
       <Row>
@@ -177,6 +249,7 @@ Address: ${device.address}`
         </View>
         <View className="items-center">
           <Text className="text-sm text-muted-foreground">Currently</Text>
+          <Text className="text-2xl font-semibold">{ledState}</Text>
         </View>
         <View className="items-center">
           <CmdButton device={device} cmd="02" label="Close" />
@@ -196,6 +269,7 @@ Address: ${device.address}`
               <Slider
                 minimumValue={0}
                 maximumValue={5000}
+                value={lightThreasholdInputValue}
                 onValueChange={setLightThreasholdInputValue}
                 step={1}
               />
