@@ -95,6 +95,9 @@ export default function Screen() {
 
       setConnection(connection)
       initailizeRead()
+
+      updateLedState()
+      loadThresholds()
     }
     catch (error) {
     // Handle error accordingly
