@@ -11,6 +11,7 @@ import {
   CardFooter,
   CardHeader,
 } from '~/components/ui/card'
+import { Input } from '~/components/ui/input'
 import { Text } from '~/components/ui/text'
 
 const deviceName = 'GROUP28 SMART CURTAIN'
@@ -82,90 +83,84 @@ export default function Screen() {
       await selectPairedDevices()
     }
 
-    if (device) {
-      let connection = await device.isConnected()
-      if (!connection) {
-        connection = await device.connect()
-        console.log('Connected')
-      }
-      else {
-        console.log('Already connected')
-      }
-
-      setConnection(connection)
-      initailizeRead()
-
-      updateLedState()
-      loadThresholds()
+    let connection = await device.isConnected()
+    if (!connection) {
+      connection = await device.connect()
+      console.log('Connected')
     }
+    else {
+      console.log('Already connected')
+    }
+
+    setConnection(connection)
+    initailizeRead()
+
+    // loadLightIntensity()
+    device?.write('11', 'hex') // Load led_state
+    device?.write('12', 'hex') // Load adc_value
+    device?.write('13', 'hex') // Load light_thresold_upper
+    device?.write('14', 'hex') // Load light_thresold_lower
+    device?.write('15', 'hex') // Load LIGHT_interval_secs
   }
 
   async function disconnect() {
     if (device) {
-      await device.disconnect()
+      console.log('Disconnecting')
       removeReadSubscription()
+      await device.disconnect()
     }
   }
 
-  function waitForData(timeout: number): Promise<string> {
-    return new Promise((resolve, reject) => {
-      if (!device) {
-        reject(new Error('Device not found'))
-      }
-
-      let timeoutId: NodeJS.Timeout | null = null
-
-      const subscription = device!.onDataReceived((msg) => {
-        subscription.remove()
-        resolve(msg.data)
-
-        if (timeoutId) {
-          clearTimeout(timeoutId)
-        }
-      })
-
-      timeoutId = setTimeout(() => {
-        if (subscription) {
-          subscription.remove()
-        }
-      }, timeout)
-    })
-  }
+  // function waitForData(timeout: number): Promise<string> {
+  //   return new Promise((resolve, reject) => {
+  //     if (!device) {
+  //       reject(new Error('Device not found'))
+  //     }
+  //
+  //     let timeoutId: NodeJS.Timeout | null = null
+  //
+  //     const subscription = device!.onDataReceived((msg) => {
+  //       subscription.remove()
+  //       resolve(msg.data)
+  //
+  //       if (timeoutId) {
+  //         clearTimeout(timeoutId)
+  //       }
+  //     })
+  //
+  //     timeoutId = setTimeout(() => {
+  //       if (subscription) {
+  //         subscription.remove()
+  //       }
+  //     }, timeout)
+  //   })
+  // }
 
   const [ledState, setLedState] = React.useState<number>(0)
-
-  async function updateLedState() {
-    if (device) {
-      const promise = waitForData(1000)
-      device.write('11', 'hex')
-      const data = await promise
-
-      const val = Number.parseInt(data.split('led_state=')[1], 10)
-      setLedState(val)
-    }
-  }
 
   const [readSubscription, setReadSubscription] = React.useState<BluetoothEventSubscription | null>(null)
   const [lightIntensity, setLightIntensity] = React.useState<number>(0)
 
-  let pollLiInterval: NodeJS.Timeout | null = null
-
-  function pollLightIntensity() {
-    if (pollLiInterval) {
-      clearInterval(pollLiInterval)
-    }
-
-    pollLiInterval = setInterval(async () => {
-      if (device) {
-        device.write('12', 'hex')
-      }
-    }, 5000)
-  }
-
-  pollLightIntensity()
-
   const [lightThresoldUpper, setLightThresholdUpper] = React.useState<number>(2000)
   const [lightThresoldLower, setLightThresholdLower] = React.useState<number>(500)
+
+  const [lightIntensityPollInterval, setLightIntensityPollInterval] = React.useState<string>('5')
+
+  function applyLightIntensityPollInterval() {
+    let val = 0
+
+    if (lightIntensityPollInterval.match(/^\d+$/)) {
+      val = Number.parseInt(lightIntensityPollInterval, 10)
+    }
+    else {
+      throw new Error('Invalid value')
+    }
+
+    if (device) {
+      device.write('25', 'hex')
+      device.write(toHex(val, 2), 'hex')
+    }
+  }
 
   function initailizeRead() {
     if (!device) {
@@ -197,6 +192,11 @@ export default function Screen() {
       if (msg.data.includes('light_thresold_lower=')) {
         const val = Number.parseInt(msg.data.split('light_thresold_lower=')[1], 10)
         setLightThresholdLower(val)
+      }
+
+      if (msg.data.includes('LIGHT_interval_secs=')) {
+        const val = Number.parseInt(msg.data.split('LIGHT_interval_secs=')[1], 10)
+        setLightIntensityPollInterval(val.toString(10))
       }
     })
     setReadSubscription(subscription)
@@ -233,8 +233,10 @@ export default function Screen() {
     if (device) {
       device.write('21', 'hex')
       device.write(toHex(lightThresoldUpper, 2), 'hex')
-      device.write('22', 'hex')
-      device.write(toHex(lightThresoldLower, 2), 'hex')
+      // device.write('22', 'hex')
+      // device.write(toHex(lightThresoldLower, 2), 'hex')
+
+      applyLightIntensityPollInterval()
     }
   }
 
@@ -302,6 +304,12 @@ Address: ${device.address}`
           <Text className="text-xl font-semibold">Light Intensity Thresold</Text>
         </CardHeader>
         <CardContent>
+          <Text>Poll Interval</Text>
+          <Input
+            value={lightIntensityPollInterval}
+            onChangeText={setLightIntensityPollInterval}
+          />
+
           <View className="flex-row justify-between">
             <Text>Current Value</Text>
             <Text>{lightIntensity}</Text>
