@@ -48,11 +48,13 @@ const CmdButton: React.FC<{
   cmd: string
   label: string
   encoding?: 'utf8' | 'hex'
+  className?: string
 }> = ({ ...props }) => {
   return (
     <Button
       disabled={!props.device}
       onPress={() => props.device?.write(props.cmd, props.encoding ?? 'hex')}
+      className={props.className}
     >
       <Text className="text-2xl font-semibold">{props.label}</Text>
     </Button>
@@ -240,38 +242,47 @@ export default function Screen() {
     }
   }
 
+  const [motorSpeed, setMotorSpeed] = React.useState<number>(100)
+
+  function applyMotorSpeed() {
+    if (device) {
+      device.write('26', 'hex')
+      device.write(toHex(motorSpeed, 2), 'hex')
+    }
+  }
+
   return (
     <View className="flex-1 justify-startitems-start gap-5 p-6 bg-secondary/30">
-      <Card className="w-full p-6 rounded-2xl">
-        <CardContent>
-          <Button onPress={selectPairedDevices}>
-            <Text>
-              Load Paired Devices
-            </Text>
-          </Button>
-          <View>
-            {
-              device === null
-                ? (
-                    <Text>
-                      No device found
-                    </Text>
-                  )
-                : (
-                    <Text>
-                      {
-                        `Device found:
-Name: ${device.name} 
-Address: ${device.address}`
-                      }
-                    </Text>
-                  )
-            }
-
-          </View>
-        </CardContent>
-
-      </Card>
+      {/*       <Card className="w-full p-6 rounded-2xl"> */}
+      {/*         <CardContent> */}
+      {/*           <Button onPress={selectPairedDevices}> */}
+      {/*             <Text> */}
+      {/*               Load Paired Devices */}
+      {/*             </Text> */}
+      {/*           </Button> */}
+      {/*           <View> */}
+      {/*             { */}
+      {/*               device === null */}
+      {/*                 ? ( */}
+      {/*                     <Text> */}
+      {/*                       No device found */}
+      {/*                     </Text> */}
+      {/*                   ) */}
+      {/*                 : ( */}
+      {/*                     <Text> */}
+      {/*                       { */}
+      {/*                         `Device found: */}
+      {/* Name: ${device.name}  */}
+      {/* Address: ${device.address}` */}
+      {/*                       } */}
+      {/*                     </Text> */}
+      {/*                   ) */}
+      {/*             } */}
+      {/**/}
+      {/*           </View> */}
+      {/*         </CardContent> */}
+      {/**/}
+      {/*       </Card> */}
 
       <Row>
         <Button onPress={connect}>
@@ -291,13 +302,45 @@ Address: ${device.address}`
           <CmdButton device={device} cmd="01" label="Open" />
         </View>
         <View className="items-center">
-          <Text className="text-sm text-muted-foreground">Currently</Text>
-          <Text className="text-2xl font-semibold">{ledState}</Text>
+          <CmdButton device={device} cmd="03" label="Half" />
         </View>
         <View className="items-center">
           <CmdButton device={device} cmd="02" label="Close" />
         </View>
+        <View className="items-center">
+          <CmdButton device={device} cmd="04" label="Stop" className="bg-red-500" />
+        </View>
       </Row>
+
+      <Card>
+        <CardHeader>
+          <Text className="text-xl font-semibold">Motor Speed</Text>
+        </CardHeader>
+        <CardContent>
+          <View className="flex-row justify-between">
+            <View className="grow">
+              <Slider
+                minimumValue={0}
+                maximumValue={200}
+                value={motorSpeed}
+                onValueChange={setMotorSpeed}
+                step={1}
+              />
+            </View>
+            <Text className="w-[40px]">
+              {motorSpeed}
+              %
+            </Text>
+          </View>
+        </CardContent>
+        <CardFooter>
+          <View className="flex-row justify-between gap-6">
+            <Button onPress={applyMotorSpeed}>
+              <Text>Apply</Text>
+            </Button>
+          </View>
+        </CardFooter>
+      </Card>
 
       <Card>
         <CardHeader>
