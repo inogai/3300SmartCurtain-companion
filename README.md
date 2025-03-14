@@ -1,16 +1,5 @@
-# Starter base
+# 3300ProjectCompanionApp
 
-A starting point to help you set up your project quickly and use the common components provided by `react-native-reusables`. The idea is to make it easier for you to get started.
+A bluetooth remote app for course project Powered by react-native.
 
-## Features
-
-- NativeWind v4
-- Dark and light mode
-  - Android Navigation Bar matches mode
-  - Persistant mode
-- Common components
-  - ThemeToggle, Avatar, Button, Card, Progress, Text, Tooltip
-
-<img src="https://github.com/mrzachnugent/react-native-reusables/assets/63797719/42c94108-38a7-498b-9c70-18640420f1bc"
-     alt="starter-base-template"
-     style="width:270px;" />
+![ ](./docs/Screenshot_2024-11-25-23-52-01-23_51a45c28b2bd560e117fd2b13fe9ef06.jpg)
